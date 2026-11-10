@@ -1,0 +1,266 @@
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.body.addEventListener('selectstart', function(e) {
+      e.preventDefault();
+      return false;
+    });
+    
+    document.body.addEventListener('dragstart', function(e) {
+      e.preventDefault();
+      return false;
+    });
+    
+    document.body.addEventListener('contextmenu', function(e) {
+      if (e.target.closest('input, textarea, [contenteditable="true"]')) {
+        return true;
+      }
+      e.preventDefault();
+      return false;
+    });
+
+    const aboutContactLink = document.getElementById('about-contact-link');
+    const logoHome = document.getElementById('logo-home');
+    const gallerySection = document.getElementById('gallery-section');
+    const aboutContactPage = document.getElementById('about-contact-page');
+
+    let currentPage = 'gallery';
+
+    aboutContactPage.style.display = 'none';
+    gallerySection.style.display = 'block';
+
+    function showGallery() {
+      if (currentPage === 'gallery') return;
+      aboutContactPage.style.display = 'none';
+      aboutContactPage.classList.remove('visible');
+      gallerySection.style.display = 'block';
+      currentPage = 'gallery';
+      aboutContactLink.classList.remove('active');
+    }
+
+    function showAboutContact() {
+      if (currentPage === 'about-contact') return;
+      gallerySection.style.display = 'none';
+      aboutContactPage.style.display = 'flex';
+      aboutContactPage.classList.add('visible');
+      currentPage = 'about-contact';
+      aboutContactLink.classList.add('active');
+    }
+
+    logoHome.addEventListener('click', (e) => {
+      e.preventDefault();
+      showGallery();
+      history.pushState({ page: 'gallery' }, 'Gallery', '/');
+    });
+
+    aboutContactLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      showAboutContact();
+      history.pushState({ page: 'about-contact' }, 'About / Contact', '#about-contact');
+    });
+
+    window.addEventListener('popstate', () => {
+      if (window.location.hash === '#about-contact') showAboutContact();
+      else showGallery();
+    });
+
+    if (window.location.hash === '#about-contact') showAboutContact();
+    else showGallery();
+
+    const gallery = document.getElementById('gallery');
+    
+    function loadAllImages() {
+      let currentNumber = 100;
+      
+      function tryLoadImage(num) {
+        if (num < 1) {
+          console.log('Finished checking all numbers 80 to 1');
+          return;
+        }
+        
+        const img = new Image();
+        
+        img.onload = function() {
+          const item = document.createElement('div');
+          item.className = 'gallery-item';
+          item.dataset.projectNumber = num;
+          
+          item.addEventListener('click', () => {
+            if (currentPage === 'gallery') openLightbox(num);
+          });
+          
+          const galleryImg = document.createElement('img');
+          galleryImg.src = `pro${num}.avif?t=${Date.now()}`;
+          
+          let projectType = '';
+          if (num >= 80) projectType = 'Luxury residential interior';
+          else if (num >= 60) projectType = 'Modern commercial space';
+          else if (num >= 40) projectType = 'Furniture product design';
+          else if (num >= 20) projectType = 'Architectural exterior';
+          else projectType = 'Cinematic architectural interior';
+          
+          galleryImg.alt = `${projectType} - Project ${num} by Agon Visuals`;
+          
+          item.appendChild(galleryImg);
+          gallery.appendChild(item);
+          
+          tryLoadImage(num - 1);
+        };
+        
+        img.onerror = function() {
+          console.log(`pro${num}.avif not found - skipping`);
+          tryLoadImage(num - 1);
+        };
+        
+        img.src = `pro${num}.avif?t=${Date.now()}`;
+      }
+      
+      tryLoadImage(100);
+    }
+
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxClose = document.getElementById('lightbox-close');
+    const lightboxCircles = document.getElementById('lightbox-circles');
+    const clickZoneLeft = document.getElementById('click-zone-left');
+    const clickZoneRight = document.getElementById('click-zone-right');
+    
+    let currentProject = null;
+    let currentImages = [];
+    let currentIndex = 0;
+    
+    const projectImageSets = new Map();
+    
+    async function openLightbox(proNumber) {
+      if (!projectImageSets.has(proNumber)) {
+        const images = [proNumber];
+        let additionalIndex = 1;
+        
+        while (true) {
+          const additionalSrc = `pro${proNumber}(${additionalIndex}).avif?t=${Date.now()}`;
+          const exists = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+            img.src = additionalSrc;
+          });
+          
+          if (exists) {
+            images.push(`${proNumber}(${additionalIndex})`);
+            additionalIndex++;
+          } else {
+            break;
+          }
+        }
+        
+        projectImageSets.set(proNumber, images);
+      }
+      
+      currentImages = projectImageSets.get(proNumber);
+      currentProject = proNumber;
+      currentIndex = 0;
+      
+      lightboxImg.src = `pro${currentImages[0]}.avif?t=${Date.now()}`;
+      updateCircles(currentImages.length, 0);
+      lightbox.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    
+    function closeLightbox() {
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+      lightboxCircles.innerHTML = '';
+    }
+    
+    function updateCircles(total, active) {
+      lightboxCircles.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const circle = document.createElement('div');
+        circle.className = 'circle-indicator';
+        if (i === active) circle.classList.add('active');
+        circle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigateToImage(i);
+        });
+        lightboxCircles.appendChild(circle);
+      }
+    }
+    
+    function navigateToImage(index) {
+      if (!currentProject || index < 0 || index >= currentImages.length) return;
+      currentIndex = index;
+      lightboxImg.src = `pro${currentImages[index]}.avif?t=${Date.now()}`;
+      updateCircles(currentImages.length, index);
+    }
+    
+    function nextImage() {
+      if (!currentProject) return;
+      let newIndex = currentIndex + 1;
+      if (newIndex >= currentImages.length) newIndex = 0;
+      navigateToImage(newIndex);
+    }
+    
+    function prevImage() {
+      if (!currentProject) return;
+      let newIndex = currentIndex - 1;
+      if (newIndex < 0) newIndex = currentImages.length - 1;
+      navigateToImage(newIndex);
+    }
+    
+    clickZoneLeft.addEventListener('click', (e) => {
+      e.stopPropagation();
+      prevImage();
+    });
+    
+    clickZoneRight.addEventListener('click', (e) => {
+      e.stopPropagation();
+      nextImage();
+    });
+    
+    lightboxClose.addEventListener('click', closeLightbox);
+    
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+    
+    document.addEventListener('keydown', (e) => {
+      if (lightbox.classList.contains('active')) {
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          prevImage();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          nextImage();
+        }
+      }
+    });
+
+    // Copy email functionality
+    const copyEmailBtn = document.getElementById('copy-email-btn');
+    let copyTimeout;
+
+    copyEmailBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      try {
+        await navigator.clipboard.writeText('visualsagon@gmail.com');
+        
+        copyEmailBtn.textContent = 'copied';
+        copyEmailBtn.classList.add('copied');
+        
+        clearTimeout(copyTimeout);
+        
+        copyTimeout = setTimeout(() => {
+          copyEmailBtn.textContent = 'copy';
+          copyEmailBtn.classList.remove('copied');
+        }, 500);
+        
+      } catch (err) {
+        console.error('Failed to copy email:', err);
+      }
+    });
+
+    loadAllImages();
+  });
+</script>
